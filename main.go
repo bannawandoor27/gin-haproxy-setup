@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -90,27 +92,56 @@ func handleWebSocket(c *gin.Context) {
 func main() {
 	r := gin.Default()
 
-	// A simple HTTP handler that forwards requests to WebSocket connections.
-	r.GET("/", func(c *gin.Context) {
+	// Define a struct to hold the relevant parts of the request
+	type HTTPRequest struct {
+		Method  string              `json:"method"`
+		Path    string              `json:"path"`
+		Headers map[string][]string `json:"headers"`
+		Body    string              `json:"body"` // Assuming body is text for simplicity
+	}
+
+	// Modify your "/" endpoint handler to serialize the HTTP request
+	r.POST("/", func(c *gin.Context) {
 		conn := pool.Get()
 		if conn == nil {
 			c.String(http.StatusServiceUnavailable, "No WebSocket connections available")
 			return
 		}
 
-		// Forward a simple message to the WebSocket connection.
-		// In a real application, you would serialize your HTTP request data and send it here.
-		err := conn.WriteMessage(websocket.TextMessage, []byte("Message from HTTP"))
+		// Read the body (if you expect one)
+		bodyBytes, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			log.Println("error reading request body:", err)
+			c.String(http.StatusInternalServerError, "Failed to read request body")
+			return
+		}
+
+		// Create an instance of HTTPRequest containing the request details
+		httpRequest := HTTPRequest{
+			Method:  c.Request.Method,
+			Path:    c.Request.URL.Path,
+			Headers: c.Request.Header,
+			Body:    string(bodyBytes),
+		}
+
+		// Serialize the HTTPRequest to JSON
+		requestJson, err := json.Marshal(httpRequest)
+		if err != nil {
+			log.Println("error marshalling request to JSON:", err)
+			c.String(http.StatusInternalServerError, "Failed to serialize request")
+			return
+		}
+
+		// Send the serialized request over the WebSocket connection
+		err = conn.WriteMessage(websocket.TextMessage, requestJson)
 		if err != nil {
 			log.Println("error forwarding message:", err)
 			c.String(http.StatusInternalServerError, "Failed to forward message")
 			return
 		}
 
-		// Placeholder response. Implement logic to wait for and retrieve the actual response.
 		c.String(http.StatusOK, "Request forwarded to WebSocket")
 	})
-
 	// WebSocket handler
 	r.GET("/ws", handleWebSocket)
 

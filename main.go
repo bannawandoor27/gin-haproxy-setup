@@ -92,23 +92,20 @@ func handleWebSocket(c *gin.Context) {
 func main() {
 	r := gin.Default()
 
-	// Define a struct to hold the relevant parts of the request
 	type HTTPRequest struct {
 		Method  string              `json:"method"`
 		Path    string              `json:"path"`
 		Headers map[string][]string `json:"headers"`
-		Body    string              `json:"body"` // Assuming body is text for simplicity
+		Body    string              `json:"body"`
 	}
 
-	// Modify your "/" endpoint handler to serialize the HTTP request
-	r.POST("/", func(c *gin.Context) {
+	r.POST("/send_application/", func(c *gin.Context) {
 		conn := pool.Get()
 		if conn == nil {
 			c.String(http.StatusServiceUnavailable, "No WebSocket connections available")
 			return
 		}
 
-		// Read the body (if you expect one)
 		bodyBytes, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
 			log.Println("error reading request body:", err)
@@ -116,7 +113,6 @@ func main() {
 			return
 		}
 
-		// Create an instance of HTTPRequest containing the request details
 		httpRequest := HTTPRequest{
 			Method:  c.Request.Method,
 			Path:    c.Request.URL.Path,
@@ -124,7 +120,6 @@ func main() {
 			Body:    string(bodyBytes),
 		}
 
-		// Serialize the HTTPRequest to JSON
 		requestJson, err := json.Marshal(httpRequest)
 		if err != nil {
 			log.Println("error marshalling request to JSON:", err)
@@ -132,7 +127,6 @@ func main() {
 			return
 		}
 
-		// Send the serialized request over the WebSocket connection
 		err = conn.WriteMessage(websocket.TextMessage, requestJson)
 		if err != nil {
 			log.Println("error forwarding message:", err)
@@ -140,7 +134,15 @@ func main() {
 			return
 		}
 
-		c.String(http.StatusOK, "Request forwarded to WebSocket")
+		// Wait for a response from the FastAPI client
+		_, responseJson, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("error reading response message:", err)
+			c.String(http.StatusInternalServerError, "Failed to read response message")
+			return
+		}
+
+		c.Data(http.StatusOK, "application/json", responseJson)
 	})
 	// WebSocket handler
 	r.GET("/ws", handleWebSocket)

@@ -9,7 +9,7 @@ app = FastAPI()
 
 # The URL of the WebSocket in your Gin application
 WS_URL = "ws://34.93.234.147/ws"
-WS_URL = "ws://localhost:8080/ws"
+# WS_URL = "ws://localhost:8080/ws"
 
 
 async def connect_to_gin_ws():
@@ -26,13 +26,12 @@ async def connect_to_gin_ws():
                     message = await websocket.recv()
                     request_obj = json.loads(message)
                     # print(f"Received request: {request_obj}")
-
                     # Prepare a response with default values
                     response_obj = {
                         "status": "success",
                         "data": {
                             "message": "Processed by FastAPI",
-                            "defaultKey": 800*5000
+                            "defaultKey": 'bannaaa'
                         }
                     }
 
